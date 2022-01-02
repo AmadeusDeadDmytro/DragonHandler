@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 export class AppService {
   getHello(): any {
     return {
-      status: 'app running'
+      status: 'repaired'
     };
   }
 }

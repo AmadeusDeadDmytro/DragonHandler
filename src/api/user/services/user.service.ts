@@ -12,6 +12,8 @@ import { CreateUserDto } from '../model/dto/create-user.dto';
 import { GetUserDto } from '../model/dto/get-user.dto';
 import { SALT_ROUNDS } from '../../../configuration/user.config';
 import { paginate, Pagination } from 'nestjs-typeorm-paginate';
+import {AuthService} from "../../auth/service/auth.service";
+import {ILoginResponse} from "../model/dto/login-response.interface";
 
 const bcrypt = require('bcrypt');
 
@@ -20,19 +22,27 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private authService: AuthService
   ) {}
 
-  async login(dto: LoginUserDto): Promise<IUser> {
+  async login(dto: LoginUserDto): Promise<ILoginResponse> {
     const user = await this.userRepository.findOne({ nickname: dto.nickname });
     if (!user) throw new NotFoundException();
 
-    const match: boolean = await this.validatePassword(
+    const match: boolean = await this.authService.validatePassword(
       dto.password,
       user.password,
     );
     if (!match) throw new BadRequestException('Incorrect Password');
 
-    return user;
+    const token = await this.authService.generateJwt(user)
+
+    return {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      accessToken: token
+    };
   }
 
   async create(dto: CreateUserDto): Promise<IUser> {
@@ -41,7 +51,7 @@ export class UserService {
     if (await this.nicknameExists(dto.nickname))
       throw new BadRequestException('Nickname Occupied');
 
-    const hashedPassword = await this.hashPassword(dto.password);
+    const hashedPassword = await this.authService.hashPassword(dto.password);
     const newUser: IUser = {
       email: dto.email,
       password: hashedPassword,
@@ -75,16 +85,5 @@ export class UserService {
     const users = await this.userRepository.find(params);
 
     return users.length > 0;
-  }
-
-  private async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, SALT_ROUNDS);
-  }
-
-  private async validatePassword(
-    password: string,
-    hashedPassword: string,
-  ): Promise<any> {
-    return bcrypt.compare(password, hashedPassword);
   }
 }

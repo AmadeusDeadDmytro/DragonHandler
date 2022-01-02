@@ -1,33 +1,32 @@
-import {Body, Controller, Get, Post} from "@nestjs/common";
-import {UserService} from "./services/user.service";
-import {LoginUserDto} from "./model/dto/login-user.dto";
-import {Observable} from "rxjs";
-import {IUser} from "./model/user.interface";
-import {CreateUserDto} from "./model/dto/create-user.dto";
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { UserService } from './services/user.service';
+import { LoginUserDto } from './model/dto/login-user.dto';
+import { IUser } from './model/user.interface';
+import { CreateUserDto } from './model/dto/create-user.dto';
+import { GetUserDto } from './model/dto/get-user.dto';
+import { Pagination } from 'nestjs-typeorm-paginate';
 
 @Controller('user')
 export class UserController {
-    constructor(
-        private userService: UserService
-    ) {}
+  constructor(private userService: UserService) {}
 
-    @Post('login')
-    login(@Body() dto: LoginUserDto): Observable<IUser> {
-        return true as any;
-    }
+  @Post('login')
+  login(@Body() dto: LoginUserDto): Promise<IUser> {
+    return this.userService.login(dto);
+  }
 
-    @Post('create')
-    create(@Body() dto: CreateUserDto): Observable<IUser> {
-        return true as any;
-    }
+  @Post('create')
+  create(@Body() dto: CreateUserDto): Promise<IUser> {
+    return this.userService.create(dto);
+  }
 
-    @Get('getOne')
-    getOne(): Observable<IUser>{
-        return true as any;
-    }
+  @Get('getOne')
+  getOne(): Promise<IUser> {
+    return this.userService.getOne('');
+  }
 
-    @Get('getAll')
-    getAll(): Observable<IUser[]> {
-        return true as any;
-    }
+  @Get('getAll')
+  getAll(@Body() dto: GetUserDto): Promise<Pagination<IUser>> {
+    return this.userService.getAll(dto);
+  }
 }

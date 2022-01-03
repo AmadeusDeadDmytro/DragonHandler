@@ -6,14 +6,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../model/user.entity';
 import { Repository } from 'typeorm';
-import { LoginUserDto } from '../model/dto/login-user.dto';
+import { LoginUserDto } from '../../auth/dto/login-user.dto';
 import { IUser } from '../model/user.interface';
-import { CreateUserDto } from '../model/dto/create-user.dto';
+import { RegisterUserDto } from '../../auth/dto/register-user.dto';
 import { GetUserDto } from '../model/dto/get-user.dto';
 import { SALT_ROUNDS } from '../../../configuration/user.config';
 import { paginate, Pagination } from 'nestjs-typeorm-paginate';
 import {AuthService} from "../../auth/service/auth.service";
-import {ILoginResponse} from "../model/dto/login-response.interface";
+import {IAuthResponse} from "../model/dto/auth-response.interface";
+import {UpdateUserDto} from "../model/dto/update-user.dto";
 
 const bcrypt = require('bcrypt');
 
@@ -24,43 +25,6 @@ export class UserService {
     private userRepository: Repository<User>,
     private authService: AuthService
   ) {}
-
-  async login(dto: LoginUserDto): Promise<ILoginResponse> {
-    const user = await this.userRepository.findOne({ nickname: dto.nickname });
-    if (!user) throw new NotFoundException();
-
-    const match: boolean = await this.authService.validatePassword(
-      dto.password,
-      user.password,
-    );
-    if (!match) throw new BadRequestException('Incorrect Password');
-
-    const token = await this.authService.generateJwt(user)
-
-    return {
-      id: user.id,
-      email: user.email,
-      nickname: user.nickname,
-      accessToken: token
-    };
-  }
-
-  async create(dto: CreateUserDto): Promise<IUser> {
-    if (await this.emailExists(dto.email))
-      throw new BadRequestException('Email Occupied');
-    if (await this.nicknameExists(dto.nickname))
-      throw new BadRequestException('Nickname Occupied');
-
-    const hashedPassword = await this.authService.hashPassword(dto.password);
-    const newUser: IUser = {
-      email: dto.email,
-      password: hashedPassword,
-      nickname: dto.nickname,
-    };
-
-    const createdUser = this.userRepository.create(newUser);
-    return this.userRepository.save(createdUser);
-  }
 
   async getOne(id: string): Promise<IUser> {
     return this.userRepository.findOne(id);
@@ -73,17 +37,32 @@ export class UserService {
     });
   }
 
+  async update(id: string, dto: UpdateUserDto): Promise<IUser> {
+    const user = await this.userRepository.findOne(id);
+    if (!user) throw new NotFoundException();
+
+    if (dto.email && dto.email !== user.email && await this.emailExists(dto.email)) {
+      throw new BadRequestException('Email Occupied');
+    }
+    if (dto.nickname && dto.nickname !== user.nickname && await this.nicknameExists(dto.nickname)) {
+      throw new BadRequestException('Nickname Occupied');
+    }
+
+    if (dto.email) user.email = dto.email
+    if (dto.nickname) user.nickname = dto.nickname
+    if (dto.password) user.password = await this.authService.hashPassword(user.password)
+
+    return this.userRepository.save(user);
+  }
+
   private async emailExists(email: string): Promise<boolean> {
     const params: GetUserDto = { email: email };
     const users = await this.userRepository.find(params);
-
     return users.length > 0;
   }
-
   private async nicknameExists(nickname: string): Promise<boolean> {
     const params: GetUserDto = { nickname: nickname };
     const users = await this.userRepository.find(params);
-
     return users.length > 0;
   }
 }
